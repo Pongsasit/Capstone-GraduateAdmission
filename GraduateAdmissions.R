@@ -1,0 +1,184 @@
+###1.Introduction
+
+##1.1introduction
+#This dataset is inspired by the UCLA Graduate Dataset. The test scores and GPA are in the older format. The dataset is owned by Mohan S Acharya.
+##1.2overview
+#The dataset contains several parameters which are considered important during the application for Masters Programs. The parameters included are : 1. GRE Scores ( 290 to 340 ) 2. TOEFL Scores ( 92 to 120 ) 3. University Rating ( 1 to 5 ) 4. Statement of Purpose and Letter of Recommendation Strength ( 1 to 5 ) 5. Undergraduate GPA ( 6.8 to 9.92 ) 6. Research Experience (0 or 1 ) 7. Chance of Admit ( 0.34 to 0.97 )
+##1.3Goal of this project
+#This dataset was built with the purpose of helping students in shortlisting universities with their profiles. The predicted output gives them a fair idea about their chances for a particular university.
+##1.4Describe dataset
+#This dataset is created for prediction of graduate admissions and the dataset link is below:
+#  https://www.kaggle.com/mohansacharya/graduate-admissions
+
+#First Look at the dataset
+
+
+#Download useful package.
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(dplyr)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(corrplot)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(rpart)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages("caret", repos = "http://cran.us.r-project.org")
+
+
+library(tidyverse)
+library(dplyr)
+#Define the dataset in admission
+admission <- read.csv("C:/Users/pongsasit/Desktop/code/R_datascience/capstone/GraduateAdmissions/graduate-admissions/Admission_Predict_Ver1.1.csv")
+
+#find NA in dataset
+str(admission)
+sum(is.na(admission))
+#make a table(only head)
+head(admission)
+#summary of dataset
+summary(admission)
+
+
+#Because serial Number is not include as a factor for the prediction.
+
+admission <- admission %>% select(GRE.Score,TOEFL.Score,University.Rating,SOP,LOR,CGPA,Research,Chance.of.Admit)
+
+
+#Visualize the data to see how this dataset looklike.
+
+#The distribution between GRE score and Amount of people can be shown like below.
+hist(admission$GRE.Score)
+
+
+#The the relation between chance of admit and GRE score is important to know too.
+
+#The relation between GRE score and And the chance of admit, shown like below.
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit))+geom_point()+geom_smooth()+ggtitle("Relation: Chances of Admit and GRE Score")
+
+#The students have different background so only GRE Score is not enough to judge the result of admission.
+#Now we will plot the relation between GRE Score and Chance of admit base on, Reseach, SOP, LOR, CGPA,TOEFL.Score, University rating as below.
+
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit,col=Research))+geom_point()+ggtitle("Relation: Chances of Admit and GRE Score based on Research")
+
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit,col=SOP))+geom_point()+ggtitle("Relation: Chances of Admit and GRE Score based on SOP")
+
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit,col=LOR))+geom_point()+ggtitle("Relation: Chances of Admit and GRE Score based on LOR")
+
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit,col=CGPA))+geom_point()+ggtitle("Relation: Chances of Admit and GRE Score based on CGPA")
+
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit,col=TOEFL.Score))+geom_point()+ggtitle("Relation: Chances of Admit and GRE Score based on TOEFL Score")
+
+ggplot(admission,aes(x=GRE.Score,y=Chance.of.Admit,col=University.Rating))+geom_point()+ggtitle("Relation: Chances of Admit and GRE Score based on University Rating")
+
+
+
+#To make these graph easier to understand I will make a table for corelation.
+
+library(corrplot)
+
+C<-cor(admission)
+corrplot(C,method='number')
+
+#As the table above now I know the relation between data and their corelation.
+###2.Analysis
+#For make the model to predict the dataset I will split the data in to 2 set. First for training(80%) and second for testing(20%).
+#As below you will see the code.
+
+library(caret)
+set.seed(1)
+test_index <- createDataPartition(y = admission$Chance.of.Admit, times = 1, p = 0.2, list = FALSE)
+train <- admission[-test_index,]
+test <- admission[test_index,]
+
+
+###2.1 Modeling Method
+#By this data set I will try  3 machine learning method : Linear regression, Decision Tree (and Randomforest) and K-NN.
+##2.1.1 Linear regression (model1)
+
+model1 <- lm(Chance.of.Admit~.,data = train)
+summary(model1)
+
+#SOR has only tiny influence in this model so we can exclude it.
+
+model1_2 <- lm(Chance.of.Admit~.-SOP,data = train)
+summary(model1_2)
+
+#Now I use this model to predict using model1_2 on the test dataset.
+
+pred<-predict(model1_2,newdata=test)
+model1_2_RSME <- sqrt(mean((pred-test$Chance.of.Admit)^2))
+
+rmse_results <- data_frame(method = "Linear regression", RMSE = model1_2_RSME)
+rmse_results
+
+
+
+#Now we find RMSE of this model is 0.06424821. Which could be better.
+
+##2.1.2 Decision Tree (and Randonforest)
+
+library(rpart)
+model2_tree <- rpart(Chance.of.Admit~.-SOP, data =train)
+
+#Now I will check the RMSE.
+
+pred<-predict(model2_tree,newdata=test)
+Deciciontree_RSME <- sqrt(mean((pred-test$Chance.of.Admit)^2))
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="Decision Tree",  
+                                     RMSE = Deciciontree_RSME))
+rmse_results
+
+#This method is worse than Linear regression but, I can improve it using randomforest algorithm
+
+library(randomForest)
+model2_forest <- randomForest(Chance.of.Admit~.-SOP, data = train)
+
+
+pred<-predict(model2_forest,newdata=test)
+RandomForest_RMSE <- sqrt(mean((pred-test$Chance.of.Admit)^2))
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="RandomForest",  
+                                     RMSE = RandomForest_RMSE))
+rmse_results
+
+#The RMSE value is smaller.
+
+##2.1.3 KNN method
+
+library(caret)
+model3_knn <- knn3(Chance.of.Admit~.-SOP, data =train)
+
+
+pred<-predict(model3_knn,newdata=test)
+knn_RMSE <- sqrt(mean((pred-test$Chance.of.Admit)^2))
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="RandomForest",  
+                                     RMSE = knn_RMSE))
+rmse_results
+
+#KNN model is the worst.
+
+##2.1.4 Logistic regression
+
+model4_LR <- glm(Chance.of.Admit~.-SOP, data =train)
+
+
+pred<-predict(model4_LR,newdata=test)
+logistic_regression_RMSE <- sqrt(mean((pred-test$Chance.of.Admit)^2))
+
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method="Logistic Regression",  
+                                     RMSE = logistic_regression_RMSE))
+rmse_results
+
+
+###Result section
+rmse_results
+#As you see above the model that can predict the best is Linear regression model.
+#The RMSE value is 0.06424821.
+
+
+#Now I will use this linear regression model to predict chance for admissions for the given values (some value are mine).
+predict(model1_2,data.frame(GRE.Score=330,TOEFL.Score=103,University.Rating=4,SOP=3.5,LOR=3.5,CGPA=7.5,Research=1))
+
